@@ -3,7 +3,7 @@
         <clients>100</clients>
         <sources>2</sources>
         <threadpool>5</threadpool>
-        <queue-size>524288</queue-size>
+        <queue-size>2048</queue-size>
         <client-timeout>30</client-timeout>
         <header-timeout>15</header-timeout>
         <source-timeout>10</source-timeout>
@@ -13,11 +13,11 @@
              it also significantly increases latency between the source
              client and listening client.  For low-latency setups, you
              might want to disable this. -->
-        <burst-on-connect>0</burst-on-connect>
+        <burst-on-connect>1</burst-on-connect>
         <!-- same as burst-on-connect, but this allows for being more
              specific on how much to burst. Most people won't need to
              change from the default 64k. Applies to all mountpoints  -->
-        <burst-size>65535</burst-size>
+        <burst-size>512</burst-size>
     </limits>
 
     <authentication>
