@@ -35,20 +35,6 @@ public class raspbaby extends DroidGap
     {
         super.onCreate(savedInstanceState);
         super.loadUrl("file:///android_asset/www/index.html");
-        playAudio();
-    }
-    
-    public void playAudio()
-    {
-    	String fileUrl = "http://192.168.1.65:8000/stream.mp3";
-    	MediaPlayer mp = new MediaPlayer();
-    	try {
-    		mp.setDataSource(fileUrl);
-    		mp.prepare();
-    		mp.start();
-    	} catch (IOException e) {
-    		System.err.println("Error");
-    	}
     }
 }
 

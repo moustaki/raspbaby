@@ -1,57 +1,44 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
-<head>
-<title>RaspBaby</title>
-</head>
-<script type="text/javascript">
+<!DOCTYPE html>
+<!--
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
 
-/* Copyright (C) 2007 Richard Atterer, richardÂ©atterer.net
-   This program is free software; you can redistribute it and/or modify it
-   under the terms of the GNU General Public License, version 2. See the file
-   COPYING for details. */
+    http://www.apache.org/licenses/LICENSE-2.0
 
-var imageNr = 0; // Serial number of current image
-var finished = new Array(); // References to img objects which have finished downloading
-var paused = false;
-
-function createImageLayer() {
-  var img = new Image();
-  img.style.position = "absolute";
-  img.style.zIndex = -1;
-  img.onload = imageOnload;
-  img.onclick = imageOnclick;
-  img.src = "http://192.168.1.65:8080/?action=snapshot&n=" + (++imageNr);
-  var webcam = document.getElementById("webcam");
-  webcam.insertBefore(img, webcam.firstChild);
-}
-
-// Two layers are always present (except at the very beginning), to avoid flicker
-function imageOnload() {
-  this.style.zIndex = imageNr; // Image finished, bring to front!
-  while (1 < finished.length) {
-    var del = finished.shift(); // Delete old image(s) from document
-    del.parentNode.removeChild(del);
-  }
-  finished.push(this);
-  if (!paused) createImageLayer();
-}
-
-function imageOnclick() { // Clicking on the image will pause the stream
-  paused = !paused;
-  if (!paused) createImageLayer();
-}
-
-</script>
-<body onload="createImageLayer();">
-
-<div id="webcam"><noscript><img src="/?action=snapshot" /></noscript></div>
-
-<div id="audio">
-    <audio controls="controls" preload="auto" autoplay="autoplay">
-            <source src="http://192.168.1.65:8000/audio.mp3" type="audio/mpeg"/>
-    </audio>
-</div>
-
-</body>
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+     KIND, either express or implied.  See the License for the
+    specific language governing permissions and limitations
+    under the License.
+-->
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="format-detection" content="telephone=no" />
+        <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width, height=device-height, target-densitydpi=device-dpi" />
+        <link rel="stylesheet" type="text/css" href="css/index.css" />
+        <title>RaspBaby</title>
+    </head>
+    <body>
+        <div class="app">
+            <h1>RaspBaby</h1>
+            <div id="deviceready" class="blink">
+                <p class="event listening">Connecting to Device</p>
+                <p class="event received">
+                  <div id="webcam"><noscript><img src="/?action=snapshot" /></noscript></div>
+                </p>
+            </div>
+        </div>
+        <script type="text/javascript" src="cordova-2.2.0.js"></script>
+        <script type="text/javascript" src="js/index.js"></script>
+        <script type="text/javascript">
+            app.initialize();
+        </script>
+    </body>
 </html>
