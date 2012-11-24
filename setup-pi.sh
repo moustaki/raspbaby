@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "Installing dependencies on pi..."
-ssh pi@raspberrypi "sudo apt-get install graphicsmagick-imagemagick-compat darkice icecast2 screen libmp3lame-dev libasound2-dev && mkdir raspbaby"
+ssh pi@raspberrypi "sudo apt-get update && sudo apt-get install graphicsmagick-imagemagick-compat darkice icecast2 screen libmp3lame-dev avahi-daemon libasound2-dev && mkdir raspbaby"
 ssh pi@raspberrypi "sudo apt-get build-dep darkice"
 echo "Copying code to pi..."
 scp -rd upstart/ darkice/ mjpg-streamer/ darkice-conf/ stream-audio.sh stream-video.sh rc.local pi@raspberrypi:raspbaby/ 
@@ -15,5 +15,7 @@ echo "Bumping capture volume up..."
 ssh pi@raspberrypi "amixer -c 1 set Mic 10%"
 echo "Updating rc.local..."
 ssh pi@raspberrypi "sudo cp raspbaby/rc.local /etc/rc.local"
+echo "Updating hostname..."
+ssh pi@raspberrypi "sudo sh -c 'echo raspbaby > /etc/hostname'"
 echo "Rebooting pi..."
 ssh pi@raspberrypi "sudo reboot"
