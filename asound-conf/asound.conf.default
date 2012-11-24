@@ -1,0 +1,15 @@
+pcm.mmap0 {
+    type mmap_emul;
+    slave {
+      pcm "hw:0,0";
+    }
+}
+
+pcm.!default {
+  type plug;
+  slave {
+    pcm mmap0;
+  }
+}
+
+

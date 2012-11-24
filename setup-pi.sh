@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "Installing dependencies on pi..."
-ssh pi@raspberrypi "sudo apt-get install graphicsmagick-imagemagick-compat darkice icecast2 screen libmp3lame-dev && mkdir raspbaby"
+ssh pi@raspberrypi "sudo apt-get install graphicsmagick-imagemagick-compat darkice icecast2 screen libmp3lame-dev libasound2-dev && mkdir raspbaby"
 ssh pi@raspberrypi "sudo apt-get build-dep darkice"
 echo "Copying code to pi..."
 scp -rd upstart/ darkice/ mjpg-streamer/ darkice-conf/ stream-audio.sh stream-video.sh rc.local pi@raspberrypi:raspbaby/ 
