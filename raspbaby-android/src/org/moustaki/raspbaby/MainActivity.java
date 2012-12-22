@@ -1,7 +1,13 @@
 package org.moustaki.raspbaby;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.URI;
+
+import javax.jmdns.JmDNS;
+import javax.jmdns.ServiceEvent;
+import javax.jmdns.ServiceInfo;
+import javax.jmdns.ServiceListener;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.client.ClientProtocolException;
@@ -9,9 +15,13 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.media.MediaPlayer;
 import android.net.Uri;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
+import android.net.wifi.WifiManager.MulticastLock;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
@@ -20,25 +30,27 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
 
-public class MainActivity extends Activity {
+public class MainActivity extends Activity
+{
     private static final String TAG = "MjpegActivity";
     String mjpeg_url = "http://192.168.1.76:8080?action=stream";
     String mp3_url = "http://192.168.1.76:8000/stream.mp3";
 
     private MjpegView mv;
-    private MediaPlayer mp;
     private Button playAudioButton;
 
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        //requestWindowFeature(Window.FEATURE_NO_TITLE); 
-        //getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, 
-        //WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(R.layout.activity_main);
         mv = (MjpegView) findViewById(R.id.mjpeg_view);
-        
-        playAudioButton = (Button) findViewById(R.id.play_audio);
+        handleAudio(mp3_url);
+        handleVideo(mjpeg_url);
+    }
+
+    public void handleAudio(final String mp3_url)
+    {
+    	playAudioButton = (Button) findViewById(R.id.play_audio);
         playAudioButton.setOnClickListener(new View.OnClickListener() {
 			@Override
 			public void onClick(View v) {
@@ -47,36 +59,11 @@ public class MainActivity extends Activity {
 				startActivity(Intent.createChooser(intent, "Listen with:"));
 			}
 		});
-        //playAudio();
-        //mv = new MjpegView(this);
-        //setContentView(mv);
-        new DoRead().execute(mjpeg_url);
-    }
-    
-    public void playAudio()
-    {
-    	mp = new MediaPlayer();
-    	try {
-	    	mp.setDataSource(mp3_url);
-	    	mp.prepare();
-	    	mp.start();
-	    	mp.setVolume(100, 100);
-	    	mp.setOnErrorListener(new MediaPlayer.OnErrorListener() {
-				@Override
-				public boolean onError(MediaPlayer mp, int what, int extra) {
-					Log.e(TAG, "Error playing audio " + what + " " + extra);
-					mp.start();
-					return false;
-				}
-			});
-    	} catch (IOException e) {
-    		System.err.println("Error loading audio");
-    	}
     }
 
-    public void onPause() {
-        super.onPause();
-        mv.stopPlayback();
+    public void handleVideo(String mjpeg_url)
+    {
+    	new DoRead().execute(mjpeg_url);
     }
 
     public class DoRead extends AsyncTask<String, Void, MjpegInputStream> {
