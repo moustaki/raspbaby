@@ -12,4 +12,4 @@ Running it
 
 That might take a while, but once done you should be able to see the video stream at http://raspbaby.local:8080 and the audio at http://raspbaby.local:8000/stream.mp3.
 
-There is also the beginning of an Android app in raspbaby-android, with an APK in raspbaby-android/bin/RaspBaby.apk. This is still in very early stages though. 
+There is also the beginning of an Android app in raspbaby-android, with an APK in raspbaby-android/bin/RaspBaby.apk. This is still in very early stages though (for example it doesn't auto-discover the pi yet). 
