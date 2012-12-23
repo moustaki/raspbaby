@@ -4,32 +4,25 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
 
-import javax.jmdns.JmDNS;
-import javax.jmdns.ServiceEvent;
-import javax.jmdns.ServiceInfo;
-import javax.jmdns.ServiceListener;
-
 import org.apache.http.HttpResponse;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
 
+import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
-import android.media.MediaPlayer;
 import android.net.Uri;
-import android.net.wifi.WifiInfo;
-import android.net.wifi.WifiManager;
-import android.net.wifi.WifiManager.MulticastLock;
+import android.net.nsd.NsdManager;
+import android.net.nsd.NsdServiceInfo;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
-import android.view.Window;
-import android.view.WindowManager;
 import android.widget.Button;
 
+@TargetApi(16)
 public class MainActivity extends Activity
 {
     private static final String TAG = "MjpegActivity";
@@ -38,14 +31,20 @@ public class MainActivity extends Activity
 
     private MjpegView mv;
     private Button playAudioButton;
+    
+    private NsdManager mNsdManager = null;
+    private NsdManager.ResolveListener mResolveListener = null;
 
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_main);
         mv = (MjpegView) findViewById(R.id.mjpeg_view);
-        handleAudio(mp3_url);
-        handleVideo(mjpeg_url);
+        //handleAudio(mp3_url);
+        //handleVideo(mjpeg_url);
+        
+        discoverRaspbaby();
+        
     }
 
     public void handleAudio(final String mp3_url)
@@ -63,7 +62,83 @@ public class MainActivity extends Activity
 
     public void handleVideo(String mjpeg_url)
     {
+    	Log.d(TAG, "Starting video: "  + mjpeg_url);
     	new DoRead().execute(mjpeg_url);
+    }
+    
+    public void discoverRaspbaby()
+    {
+        mResolveListener = new NsdManager.ResolveListener() {
+            @Override
+            public void onResolveFailed(NsdServiceInfo serviceInfo, int errorCode) {
+                // Called when the resolve fails.  Use the error code to debug.
+                Log.e(TAG, "Resolve failed " + errorCode + " " + serviceInfo);
+                mNsdManager.resolveService(serviceInfo, mResolveListener);
+            }
+
+            @Override
+            public void onServiceResolved(NsdServiceInfo serviceInfo) {
+                Log.d(TAG, "Resolve Succeeded. " + serviceInfo);
+                int port = serviceInfo.getPort();
+                InetAddress host = serviceInfo.getHost();
+                String serviceType = serviceInfo.getServiceType();
+                Log.d(TAG, "Type: " + serviceType);
+                if (serviceType.equals("._mjpegstreamer._tcp")) {
+                    Log.d(TAG, "Loading http:/"+host+":"+port+"?action=stream");
+                	handleVideo("http:/"+host+":"+port+"?action=stream");
+                } else if (serviceType.equals("._icecast._tcp")) {
+                	Log.d(TAG, "Loading http:/"+host+":"+port+"/stream.mp3");
+                	handleAudio("http:/"+host+":"+port+"/stream.mp3");
+                } else {
+                	Log.e(TAG, "Unknown service");
+                }
+            }
+        };
+    	
+    	mNsdManager = (NsdManager) getSystemService(Context.NSD_SERVICE);
+        // Instantiate a new DiscoveryListener
+    	NsdManager.DiscoveryListener mDiscoveryListener = new NsdManager.DiscoveryListener() {
+
+            //  Called as soon as service discovery begins.
+            @Override
+            public void onDiscoveryStarted(String regType) {
+                Log.d(TAG, "Service discovery started");
+            }
+
+            @Override
+            public void onServiceFound(NsdServiceInfo service) {
+                // A service was found!  Do something with it.
+                Log.d(TAG, "Service discovery success " + service);
+                mNsdManager.resolveService(service, mResolveListener);
+            }
+
+            @Override
+            public void onServiceLost(NsdServiceInfo service) {
+                // When the network service is no longer available.
+                // Internal bookkeeping code goes here.
+                Log.e(TAG, "service lost " + service);
+            }
+
+            @Override
+            public void onDiscoveryStopped(String serviceType) {
+                Log.i(TAG, "Discovery stopped: " + serviceType);
+            }
+
+            @Override
+            public void onStartDiscoveryFailed(String serviceType, int errorCode) {
+                Log.e(TAG, "Discovery failed: Error code: " + errorCode);
+                mNsdManager.stopServiceDiscovery(this);
+            } 
+
+            @Override
+            public void onStopDiscoveryFailed(String serviceType, int errorCode) {
+                Log.e(TAG, "Discovery failed: Error code: " + errorCode);
+                mNsdManager.stopServiceDiscovery(this);
+            }
+        };
+
+        mNsdManager.discoverServices("_mjpegstreamer._tcp.", NsdManager.PROTOCOL_DNS_SD, mDiscoveryListener);
+        mNsdManager.discoverServices("_icecast._tcp.", NsdManager.PROTOCOL_DNS_SD, mDiscoveryListener);
     }
 
     public class DoRead extends AsyncTask<String, Void, MjpegInputStream> {
