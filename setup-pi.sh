@@ -3,7 +3,7 @@
 SSH_PI=pi@raspberrypi
 
 echo "Installing dependencies on pi..."
-ssh $SSH_PI "sudo apt-get update && sudo apt-get install graphicsmagick-imagemagick-compat darkice icecast2 screen libmp3lame-dev avahi-daemon libasound2-dev && mkdir raspbaby"
+ssh $SSH_PI "sudo apt-get update && sudo apt-get install graphicsmagick-imagemagick-compat darkice icecast2 screen libmp3lame-dev avahi-daemon libasound2-dev wpasupplicant && mkdir raspbaby"
 ssh $SSH_PI "sudo apt-get build-dep darkice"
 echo "Copying code to pi..."
 scp -rd upstart/ darkice/ mjpg-streamer/ darkice-conf/ stream-audio.sh stream-video.sh rc.local $SSH_PI:raspbaby/ 
