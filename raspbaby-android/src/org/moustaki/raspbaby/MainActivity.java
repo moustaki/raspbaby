@@ -31,8 +31,6 @@ import android.widget.Button;
 public class MainActivity extends Activity
 {
     private static final String TAG = "MjpegActivity";
-    String mjpeg_url = "http://192.168.1.76:8080?action=stream";
-    String mp3_url = "http://192.168.1.76:8000/stream.mp3";
     android.os.Handler handler = new android.os.Handler();
 
     private MjpegView mv;
@@ -47,8 +45,6 @@ public class MainActivity extends Activity
 
         setContentView(R.layout.activity_main);
         mv = (MjpegView) findViewById(R.id.mjpeg_view);
-        //handleAudio(mp3_url);
-        //handleVideo(mjpeg_url);
         
         Thread t = new Thread() {
         	@Override
