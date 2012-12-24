@@ -14,7 +14,7 @@ ssh $SSH_PI "cd raspbaby/darkice && ./configure --prefix=/usr --sysconfdir=/usr/
 echo "Setting up icecast2..."
 ssh $SSH_PI "cd raspbaby && sudo cp darkice-conf/icecast-default /etc/default/icecast2 && sudo cp darkice-conf/icecast.xml /etc/icecast2/icecast.xml && sudo /etc/init.d/icecast2 restart"
 echo "Bumping capture volume up..."
-ssh $SSH_PI "amixer -c 1 set Mic 10%"
+ssh $SSH_PI "amixer -c 1 set Mic 30%"
 echo "Updating rc.local..."
 ssh $SSH_PI "sudo cp raspbaby/rc.local /etc/rc.local"
 echo "Updating hostname..."
