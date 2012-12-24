@@ -4,36 +4,43 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
 
+import javax.jmdns.JmDNS;
+import javax.jmdns.ServiceEvent;
+import javax.jmdns.ServiceListener;
+
 import org.apache.http.HttpResponse;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
 
-import android.annotation.TargetApi;
 import android.app.Activity;
-import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
-import android.net.nsd.NsdManager;
-import android.net.nsd.NsdServiceInfo;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
+import android.net.wifi.WifiManager.MulticastLock;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
+import android.text.format.Formatter;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 
-@TargetApi(16)
+
 public class MainActivity extends Activity
 {
     private static final String TAG = "MjpegActivity";
     String mjpeg_url = "http://192.168.1.76:8080?action=stream";
     String mp3_url = "http://192.168.1.76:8000/stream.mp3";
+    android.os.Handler handler = new android.os.Handler();
 
     private MjpegView mv;
     private Button playAudioButton;
     
-    private NsdManager mNsdManager = null;
-    private NsdManager.ResolveListener mResolveListener = null;
+	MulticastLock lock;
+    JmDNS jmdns;
+    ServiceListener listener;
 
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -43,9 +50,72 @@ public class MainActivity extends Activity
         //handleAudio(mp3_url);
         //handleVideo(mjpeg_url);
         
-        discoverRaspbaby();
-        
+        Thread t = new Thread() {
+        	@Override
+        	public void run()
+        	{
+                setUpDiscovery();
+                startDiscovery("_workstation._tcp.local.");
+        	}
+        };
+        t.start();
     }
+    
+    private void setUpDiscovery() 
+	{
+    	Log.d(TAG, "Setup of discovery");
+		WifiManager wifi = (WifiManager) getSystemService(android.content.Context.WIFI_SERVICE);
+		lock = wifi.createMulticastLock("HeeereDnssdLock");
+	    lock.setReferenceCounted(true);
+	    lock.acquire();
+	}
+    
+    protected void onDestroy() {
+        if (lock != null) lock.release();
+    }
+    
+    public void startDiscovery(String type)
+	{
+    	
+		try {
+			Log.d(TAG, "Starting discovery");
+			String ip = getIpAddr();
+			Log.d(TAG, "IP of Android device: " + ip);
+			jmdns = JmDNS.create(InetAddress.getByName(ip));
+			jmdns.addServiceListener(type, listener = new ServiceListener() {
+		        public void serviceResolved(ServiceEvent ev) {
+		            Log.d(TAG, "Service resolved: "
+		                     + ev.getInfo().getQualifiedName()
+		                     + " port:" + ev.getInfo().getPort());
+		            Log.d(TAG, ev.getInfo().getName());
+		        	if (ev.getInfo().getName().startsWith("raspbaby")) {
+		        		String raspIp = ev.getInfo().getHostAddresses()[0];
+		        		Log.d(TAG, "IP of Raspbaby device: " + raspIp);
+		        		handleVideo("http://" + raspIp + ":8080?action=stream");
+		        		handleAudio("http://" + raspIp + ":8000/stream.mp3");
+		        	}
+		        }
+		        public void serviceRemoved(ServiceEvent ev) {
+		            Log.d(TAG, "Service removed: " + ev.getName());
+		        }
+		        public void serviceAdded(ServiceEvent event) {
+		            // Required to force serviceResolved to be called again
+		            // (after the first search)
+		            jmdns.requestServiceInfo(event.getType(), event.getName(), 1);
+		        }
+		    });
+		} catch (IOException e) {
+			Log.e(TAG, "Discovery failed for " + type);
+		}
+	}
+    
+    public String getIpAddr() {
+ 	    WifiManager wifiManager = (WifiManager) getSystemService(WIFI_SERVICE);
+    	WifiInfo wifiInfo = wifiManager.getConnectionInfo();
+    	int ip = wifiInfo.getIpAddress();
+    	String ipString = String.format("%d.%d.%d.%d", (ip & 0xff), (ip >> 8 & 0xff), (ip >> 16 & 0xff), (ip >> 24 & 0xff));
+    	return ipString;
+     }
 
     public void handleAudio(final String mp3_url)
     {
@@ -64,81 +134,6 @@ public class MainActivity extends Activity
     {
     	Log.d(TAG, "Starting video: "  + mjpeg_url);
     	new DoRead().execute(mjpeg_url);
-    }
-    
-    public void discoverRaspbaby()
-    {
-        mResolveListener = new NsdManager.ResolveListener() {
-            @Override
-            public void onResolveFailed(NsdServiceInfo serviceInfo, int errorCode) {
-                // Called when the resolve fails.  Use the error code to debug.
-                Log.e(TAG, "Resolve failed " + errorCode + " " + serviceInfo);
-                mNsdManager.resolveService(serviceInfo, mResolveListener);
-            }
-
-            @Override
-            public void onServiceResolved(NsdServiceInfo serviceInfo) {
-                Log.d(TAG, "Resolve Succeeded. " + serviceInfo);
-                int port = serviceInfo.getPort();
-                InetAddress host = serviceInfo.getHost();
-                String serviceType = serviceInfo.getServiceType();
-                Log.d(TAG, "Type: " + serviceType);
-                if (serviceType.equals("._mjpegstreamer._tcp")) {
-                    Log.d(TAG, "Loading http:/"+host+":"+port+"?action=stream");
-                	handleVideo("http:/"+host+":"+port+"?action=stream");
-                } else if (serviceType.equals("._icecast._tcp")) {
-                	Log.d(TAG, "Loading http:/"+host+":"+port+"/stream.mp3");
-                	handleAudio("http:/"+host+":"+port+"/stream.mp3");
-                } else {
-                	Log.e(TAG, "Unknown service");
-                }
-            }
-        };
-    	
-    	mNsdManager = (NsdManager) getSystemService(Context.NSD_SERVICE);
-        // Instantiate a new DiscoveryListener
-    	NsdManager.DiscoveryListener mDiscoveryListener = new NsdManager.DiscoveryListener() {
-
-            //  Called as soon as service discovery begins.
-            @Override
-            public void onDiscoveryStarted(String regType) {
-                Log.d(TAG, "Service discovery started");
-            }
-
-            @Override
-            public void onServiceFound(NsdServiceInfo service) {
-                // A service was found!  Do something with it.
-                Log.d(TAG, "Service discovery success " + service);
-                mNsdManager.resolveService(service, mResolveListener);
-            }
-
-            @Override
-            public void onServiceLost(NsdServiceInfo service) {
-                // When the network service is no longer available.
-                // Internal bookkeeping code goes here.
-                Log.e(TAG, "service lost " + service);
-            }
-
-            @Override
-            public void onDiscoveryStopped(String serviceType) {
-                Log.i(TAG, "Discovery stopped: " + serviceType);
-            }
-
-            @Override
-            public void onStartDiscoveryFailed(String serviceType, int errorCode) {
-                Log.e(TAG, "Discovery failed: Error code: " + errorCode);
-                mNsdManager.stopServiceDiscovery(this);
-            } 
-
-            @Override
-            public void onStopDiscoveryFailed(String serviceType, int errorCode) {
-                Log.e(TAG, "Discovery failed: Error code: " + errorCode);
-                mNsdManager.stopServiceDiscovery(this);
-            }
-        };
-
-        mNsdManager.discoverServices("_mjpegstreamer._tcp.", NsdManager.PROTOCOL_DNS_SD, mDiscoveryListener);
-        mNsdManager.discoverServices("_icecast._tcp.", NsdManager.PROTOCOL_DNS_SD, mDiscoveryListener);
     }
 
     public class DoRead extends AsyncTask<String, Void, MjpegInputStream> {
