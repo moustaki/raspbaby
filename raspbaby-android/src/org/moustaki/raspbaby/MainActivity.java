@@ -1,31 +1,40 @@
 package org.moustaki.raspbaby;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.URI;
+import java.net.URISyntaxException;
 
 import javax.jmdns.JmDNS;
 import javax.jmdns.ServiceEvent;
 import javax.jmdns.ServiceListener;
 
+import javazoom.jl.decoder.Bitstream;
+import javazoom.jl.decoder.BitstreamException;
+import javazoom.jl.decoder.Decoder;
+import javazoom.jl.decoder.DecoderException;
+import javazoom.jl.decoder.Header;
+import javazoom.jl.decoder.SampleBuffer;
+
+import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
 
 import android.app.Activity;
-import android.content.Intent;
-import android.net.Uri;
+import android.media.AudioFormat;
+import android.media.AudioManager;
+import android.media.AudioTrack;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiManager.MulticastLock;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.Handler;
-import android.text.format.Formatter;
 import android.util.Log;
-import android.view.View;
-import android.widget.Button;
 
 
 public class MainActivity extends Activity
@@ -34,7 +43,6 @@ public class MainActivity extends Activity
     android.os.Handler handler = new android.os.Handler();
 
     private MjpegView mv;
-    private Button playAudioButton;
     
 	MulticastLock lock;
     JmDNS jmdns;
@@ -68,11 +76,11 @@ public class MainActivity extends Activity
     
     protected void onDestroy() {
         if (lock != null) lock.release();
+        super.onDestroy();
     }
     
     public void startDiscovery(String type)
 	{
-    	
 		try {
 			Log.d(TAG, "Starting discovery");
 			String ip = getIpAddr();
@@ -115,21 +123,68 @@ public class MainActivity extends Activity
 
     public void handleAudio(final String mp3_url)
     {
-    	playAudioButton = (Button) findViewById(R.id.play_audio);
-        playAudioButton.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				Intent intent = new Intent(Intent.ACTION_VIEW);
-				intent.setDataAndType(Uri.parse(mp3_url), "audio/mpeg");
-				startActivity(Intent.createChooser(intent, "Listen with:"));
-			}
-		});
+    	Log.d(TAG, "Starting audio: "  + mp3_url);
+    	new DoPlay().execute(mp3_url);
     }
 
     public void handleVideo(String mjpeg_url)
     {
     	Log.d(TAG, "Starting video: "  + mjpeg_url);
     	new DoRead().execute(mjpeg_url);
+    }
+    
+    public class DoPlay extends AsyncTask<String, Void, Void> {
+    	protected Void doInBackground(String... url) {
+    		boolean retry = true;
+    		while (retry) {
+	    		int shortSizeInBytes = Short.SIZE/Byte.SIZE;
+	    		Log.d(TAG, "Starting to play audio...");
+	            // define the buffer size for audio track
+	            Decoder decoder = new Decoder();
+	            int bufferSize = (int) decoder.getOutputBlockSize() * shortSizeInBytes;
+	            Log.d(TAG, "Buffer size: " + bufferSize);
+	            AudioTrack audioTrack = new AudioTrack(AudioManager.STREAM_MUSIC, 8000, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize, AudioTrack.MODE_STREAM);
+	            audioTrack.play();
+	            try {
+	            	HttpClient client = new DefaultHttpClient();
+	            	HttpGet request = new HttpGet();
+	    			request.setURI(new URI(url[0]));
+	    			HttpResponse response = client.execute(request);
+	    			HttpEntity entity = response.getEntity();
+	    			InputStream inputStream = new BufferedInputStream(entity.getContent(), 8 * decoder.getOutputBlockSize());
+	                Bitstream bitstream = new Bitstream(inputStream);
+	                boolean done = false;
+	                while (! done) { 
+	                	try { 
+	                        Header frameHeader = bitstream.readFrame();
+		                	SampleBuffer output = (SampleBuffer) decoder.decodeFrame(frameHeader, bitstream);
+		                	short[] pcm = output.getBuffer();
+		                	Log.d(TAG, "decoded " + pcm.length + " samples!"); 
+		                    audioTrack.write(pcm, 0, output.getBufferLength());
+		                    bitstream.closeFrame();
+	                	} catch (ArrayIndexOutOfBoundsException e) { 
+	                		Log.d(TAG, "Index out of bounds: " + e.getMessage()); 
+	                	}
+	                }
+	                audioTrack.stop();
+	                audioTrack.release();
+	                bitstream.closeFrame();
+	                inputStream.close();
+	            } catch (IOException e) { 
+	                Log.e(TAG, e.getMessage());
+	            } catch (DecoderException e) {
+	            	Log.e(TAG, e.getMessage());
+	            } catch (BitstreamException e) {
+	            	Log.e(TAG, e.getMessage());
+	            } catch (URISyntaxException e) {
+	            	Log.e(TAG, e.getMessage());
+	            	retry = false;
+				} catch (NullPointerException e) { 
+	        		Log.d(TAG, "Null pointer: " + e.getMessage()); 
+	        	}
+    		}
+			return null;
+    	}
     }
 
     public class DoRead extends AsyncTask<String, Void, MjpegInputStream> {
