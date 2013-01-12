@@ -44,6 +44,7 @@ public class MainActivity extends Activity
 
     private MjpegView mv;
     
+    AudioTrack audioTrack = null;
 	MulticastLock lock;
     JmDNS jmdns;
     ServiceListener listener;
@@ -76,6 +77,10 @@ public class MainActivity extends Activity
     
     protected void onDestroy() {
         if (lock != null) lock.release();
+        if (audioTrack != null) {
+        	audioTrack.stop();
+            audioTrack.release();
+        }
         super.onDestroy();
     }
     
@@ -133,7 +138,7 @@ public class MainActivity extends Activity
     	new DoRead().execute(mjpeg_url);
     }
     
-    public class DoPlay extends AsyncTask<String, Void, Void> {
+    private class DoPlay extends AsyncTask<String, Void, Void> {
     	protected Void doInBackground(String... url) {
     		boolean retry = true;
     		while (retry) {
@@ -143,7 +148,7 @@ public class MainActivity extends Activity
 	            Decoder decoder = new Decoder();
 	            int bufferSize = (int) decoder.getOutputBlockSize() * shortSizeInBytes;
 	            Log.d(TAG, "Buffer size: " + bufferSize);
-	            AudioTrack audioTrack = new AudioTrack(AudioManager.STREAM_MUSIC, 8000, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize, AudioTrack.MODE_STREAM);
+	            audioTrack = new AudioTrack(AudioManager.STREAM_MUSIC, 8000, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize, AudioTrack.MODE_STREAM);
 	            audioTrack.play();
 	            try {
 	            	HttpClient client = new DefaultHttpClient();
@@ -159,7 +164,7 @@ public class MainActivity extends Activity
 	                        Header frameHeader = bitstream.readFrame();
 		                	SampleBuffer output = (SampleBuffer) decoder.decodeFrame(frameHeader, bitstream);
 		                	short[] pcm = output.getBuffer();
-		                	Log.d(TAG, "decoded " + pcm.length + " samples!"); 
+		                	// Log.d(TAG, "decoded " + pcm.length + " samples!"); 
 		                    audioTrack.write(pcm, 0, output.getBufferLength());
 		                    bitstream.closeFrame();
 	                	} catch (ArrayIndexOutOfBoundsException e) { 
@@ -168,7 +173,6 @@ public class MainActivity extends Activity
 	                }
 	                audioTrack.stop();
 	                audioTrack.release();
-	                bitstream.closeFrame();
 	                inputStream.close();
 	            } catch (IOException e) { 
 	                Log.e(TAG, e.getMessage());
@@ -187,8 +191,8 @@ public class MainActivity extends Activity
     	}
     }
 
-    public class DoRead extends AsyncTask<String, Void, MjpegInputStream> {
-        protected MjpegInputStream doInBackground(String... url) {
+    private class DoRead extends AsyncTask<String, Void, MjpegInputStream> {
+        protected MjpegInputStream doInBackground(String... url) { 
             //TODO: if camera has authentication deal with it and don't just not work
             HttpResponse res = null;
             DefaultHttpClient httpclient = new DefaultHttpClient();     
